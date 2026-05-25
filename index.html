@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>구멘 주안점 — 매출 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --bg2: #1a1d27;
+      --bg3: #22263a;
+      --border: #2e3347;
+      --text: #e8eaf0;
+      --text2: #8b90a7;
+      --accent: #6c63ff;
+      --green: #22c55e;
+      --red: #ef4444;
+      --orange: #f97316;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+      --card-radius: 16px;
+    }
+
+    body {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .store-name { font-size: 18px; font-weight: 700; }
+    .store-sub { font-size: 13px; color: var(--text2); margin-top: 1px; }
+    .period-badge {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    /* ── Main ── */
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 28px 24px 60px;
+    }
+
+    /* ── KPI Cards ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .kpi-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 22px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--card-radius) var(--card-radius) 0 0;
+    }
+    .kpi-card.blue::before { background: var(--blue); }
+    .kpi-card.green::before { background: var(--green); }
+    .kpi-card.red::before { background: var(--red); }
+    .kpi-card.orange::before { background: var(--orange); }
+    .kpi-card.purple::before { background: var(--accent); }
+    .kpi-card.yellow::before { background: var(--yellow); }
+
+    .kpi-label { font-size: 12px; font-weight: 500; color: var(--text2); letter-spacing: 0.5px; text-transform: uppercase; }
+    .kpi-value { font-size: 26px; font-weight: 700; margin: 8px 0 4px; }
+    .kpi-value.small { font-size: 20px; }
+    .kpi-sub { font-size: 12px; color: var(--text2); }
+    .kpi-icon { position: absolute; right: 18px; top: 18px; font-size: 22px; opacity: 0.3; }
+
+    /* ── Charts Grid ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .charts-grid.wide { grid-template-columns: 2fr 1fr; }
+    .charts-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 900px) {
+      .charts-grid, .charts-grid.wide, .charts-grid.three { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 24px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 20px;
+    }
+    .chart-wrap { position: relative; }
+    .chart-wrap canvas { max-height: 300px; }
+
+    /* ── Fee breakdown bar ── */
+    .fee-bar {
+      height: 14px;
+      border-radius: 7px;
+      background: var(--bg3);
+      overflow: hidden;
+      margin: 12px 0;
+      display: flex;
+    }
+    .fee-bar-fill {
+      height: 100%;
+      border-radius: 7px;
+      background: linear-gradient(90deg, var(--green), #16a34a);
+      transition: width 1s ease;
+    }
+    .fee-bar-fill.fee {
+      background: linear-gradient(90deg, var(--red), #dc2626);
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 8px;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-val { margin-left: auto; font-weight: 600; color: var(--text); }
+
+    /* ── Menu table ── */
+    .menu-table { width: 100%; border-collapse: collapse; }
+    .menu-table th {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text2);
+      text-align: left;
+      padding: 0 0 10px;
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .menu-table td {
+      padding: 10px 0;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .menu-table tr:last-child td { border-bottom: none; }
+    .menu-rank {
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      background: var(--bg3);
+      color: var(--text2);
+    }
+    .menu-rank.top { background: linear-gradient(135deg, var(--accent), #a78bfa); color: #fff; }
+    .menu-bar-bg {
+      background: var(--bg3);
+      border-radius: 3px;
+      height: 6px;
+      margin-top: 4px;
+    }
+    .menu-bar-fill {
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent), #a78bfa);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      header { padding: 14px 16px; }
+      main { padding: 16px 12px 40px; }
+      .kpi-value { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo">🍜</div>
+    <div>
+      <div class="store-name" id="storeName">구멘 주안점</div>
+      <div class="store-sub">쿠팡이츠 매출 대시보드</div>
+    </div>
+  </div>
+  <div class="period-badge" id="periodBadge">—</div>
+</header>
+
+<main>
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-label">총 주문 건수</div>
+      <div class="kpi-value" id="kpi-orders">—</div>
+      <div class="kpi-sub" id="kpi-orders-sub">일 평균 — 건</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-label">총 주문금액</div>
+      <div class="kpi-value small" id="kpi-order-amount">—</div>
+      <div class="kpi-sub" id="kpi-order-amount-sub">건당 평균 — 원</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-icon">🏦</div>
+      <div class="kpi-label">실 정산금액</div>
+      <div class="kpi-value small" id="kpi-settlement">—</div>
+      <div class="kpi-sub" id="kpi-settlement-rate">정산율 — %</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-icon">📉</div>
+      <div class="kpi-label">총 수수료 차감</div>
+      <div class="kpi-value small" id="kpi-fees">—</div>
+      <div class="kpi-sub" id="kpi-fees-rate">수수료율 — %</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-icon">📊</div>
+      <div class="kpi-label">일 평균 주문</div>
+      <div class="kpi-value" id="kpi-avg-daily">—</div>
+      <div class="kpi-sub">주문 / 일</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-icon">🍱</div>
+      <div class="kpi-label">건당 평균금액</div>
+      <div class="kpi-value small" id="kpi-avg-value">—</div>
+      <div class="kpi-sub">주문 1건 평균</div>
+    </div>
+  </div>
+
+  <!-- Daily trend + Fee breakdown -->
+  <div class="charts-grid wide">
+    <div class="card">
+      <div class="card-title">일별 매출 추이</div>
+      <div class="card-sub">주문금액 vs 정산금액 (4월)</div>
+      <div class="chart-wrap">
+        <canvas id="dailyChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">매출 구성 분석</div>
+      <div class="card-sub">정산금액 vs 수수료 비중</div>
+      <div id="fee-breakdown">
+        <div style="margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:6px;">
+            <span>정산금액</span><span id="settle-pct" style="color:var(--green);font-weight:600;">—%</span>
+          </div>
+          <div class="fee-bar"><div class="fee-bar-fill" id="settle-bar" style="width:0"></div></div>
+          <div style="font-size:11px;color:var(--text2);">실제 입금액</div>
+        </div>
+        <div style="margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:6px;">
+            <span>수수료 차감</span><span id="fee-pct" style="color:var(--red);font-weight:600;">—%</span>
+          </div>
+          <div class="fee-bar"><div class="fee-bar-fill fee" id="fee-bar" style="width:0"></div></div>
+          <div style="font-size:11px;color:var(--text2);">중개료+배달비+결제수수료</div>
+        </div>
+        <div class="chart-wrap" style="margin-top:10px;">
+          <canvas id="feeDonut" style="max-height:200px;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu + Payment + Hourly -->
+  <div class="charts-grid wide" style="margin-bottom:20px;">
+    <div class="card">
+      <div class="card-title">인기 메뉴 TOP 15</div>
+      <div class="card-sub">주문 건수 기준</div>
+      <table class="menu-table" id="menuTable"></table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;">
+      <div class="card">
+        <div class="card-title">결제 수단 비중</div>
+        <div class="card-sub">결제 방식별 주문 수</div>
+        <div class="chart-wrap"><canvas id="paymentChart" style="max-height:200px;"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hourly + Weekday -->
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-title">시간대별 주문 분포</div>
+      <div class="card-sub">0–23시</div>
+      <div class="chart-wrap"><canvas id="hourlyChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">요일별 주문 현황</div>
+      <div class="card-sub">주문금액 기준</div>
+      <div class="chart-wrap"><canvas id="weekdayChart"></canvas></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const fmt = n => n.toLocaleString('ko-KR') + '원';
+const fmtK = n => n >= 1_000_000
+  ? (n / 1_000_000).toFixed(1) + 'M원'
+  : n >= 1_000 ? (n / 1_000).toFixed(0) + '천원' : n + '원';
+
+Chart.defaults.color = '#8b90a7';
+Chart.defaults.borderColor = '#2e3347';
+Chart.defaults.font.family = "'Pretendard', sans-serif";
+
+fetch('data.json')
+  .then(r => r.json())
+  .then(data => {
+    const s = data.summary;
+
+    document.getElementById('storeName').textContent = data.store;
+    document.getElementById('periodBadge').textContent = data.period;
+
+    // KPIs
+    document.getElementById('kpi-orders').textContent = s.total_orders.toLocaleString() + '건';
+    document.getElementById('kpi-orders-sub').textContent = `일 평균 ${s.avg_daily_orders}건`;
+    document.getElementById('kpi-order-amount').textContent = fmtK(s.total_order_amount);
+    document.getElementById('kpi-order-amount-sub').textContent = `건당 평균 ${s.avg_order_value.toLocaleString()}원`;
+    document.getElementById('kpi-settlement').textContent = fmtK(s.total_settlement);
+    const settlePct = (s.total_settlement / s.total_order_amount * 100).toFixed(1);
+    document.getElementById('kpi-settlement-rate').textContent = `정산율 ${settlePct}%`;
+    document.getElementById('kpi-fees').textContent = fmtK(s.total_fees);
+    const feePct = (s.total_fees / s.total_order_amount * 100).toFixed(1);
+    document.getElementById('kpi-fees-rate').textContent = `수수료율 ${feePct}%`;
+    document.getElementById('kpi-avg-daily').textContent = s.avg_daily_orders + '건';
+    document.getElementById('kpi-avg-value').textContent = s.avg_order_value.toLocaleString() + '원';
+
+    // Fee breakdown bars
+    document.getElementById('settle-pct').textContent = settlePct + '%';
+    document.getElementById('fee-pct').textContent = feePct + '%';
+    setTimeout(() => {
+      document.getElementById('settle-bar').style.width = settlePct + '%';
+      document.getElementById('fee-bar').style.width = feePct + '%';
+    }, 300);
+
+    // Fee donut
+    new Chart(document.getElementById('feeDonut'), {
+      type: 'doughnut',
+      data: {
+        labels: ['정산금액', '수수료 차감'],
+        datasets: [{
+          data: [s.total_settlement, s.total_fees],
+          backgroundColor: ['#22c55e', '#ef4444'],
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + fmtK(ctx.raw) + ' (' + (ctx.raw / s.total_order_amount * 100).toFixed(1) + '%)'
+            }
+          }
+        },
+        cutout: '68%'
+      }
+    });
+
+    // Daily chart
+    const dl = data.daily;
+    new Chart(document.getElementById('dailyChart'), {
+      type: 'bar',
+      data: {
+        labels: dl.map(d => d.date.slice(5)), // MM-DD
+        datasets: [
+          {
+            label: '주문금액',
+            data: dl.map(d => d.order_amount),
+            backgroundColor: 'rgba(59,130,246,0.35)',
+            borderColor: '#3b82f6',
+            borderWidth: 1.5,
+            borderRadius: 3
+          },
+          {
+            label: '정산금액',
+            data: dl.map(d => d.settlement),
+            backgroundColor: 'rgba(34,197,94,0.35)',
+            borderColor: '#22c55e',
+            borderWidth: 1.5,
+            borderRadius: 3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index' },
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 12 }, padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString()}원`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, maxTicksLimit: 10 } },
+          y: {
+            ticks: { callback: v => fmtK(v) },
+            grid: { color: '#2e3347' }
+          }
+        }
+      }
+    });
+
+    // Menu table
+    const maxCount = data.menus[0]?.count || 1;
+    const tbody = data.menus.map((m, i) => {
+      const pct = Math.round(m.count / maxCount * 100);
+      return `<tr>
+        <td style="padding-right:12px;">
+          <div class="menu-rank ${i < 3 ? 'top' : ''}">${i + 1}</div>
+        </td>
+        <td style="width:100%;">
+          <div style="font-weight:500;">${m.name}</div>
+          <div class="menu-bar-bg"><div class="menu-bar-fill" style="width:${pct}%"></div></div>
+        </td>
+        <td style="text-align:right;padding-left:12px;white-space:nowrap;font-weight:600;color:var(--accent);">${m.count.toLocaleString()}건</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('menuTable').innerHTML =
+      `<tr>
+        <th>#</th><th>메뉴</th><th style="text-align:right;">주문수</th>
+      </tr>${tbody}`;
+
+    // Payment chart
+    const colors = ['#6c63ff','#3b82f6','#22c55e','#f97316','#eab308'];
+    new Chart(document.getElementById('paymentChart'), {
+      type: 'doughnut',
+      data: {
+        labels: data.payments.map(p => p.method),
+        datasets: [{
+          data: data.payments.map(p => p.count),
+          backgroundColor: colors,
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 12, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.label}: ${ctx.raw.toLocaleString()}건 (${(ctx.raw / s.total_orders * 100).toFixed(1)}%)`
+            }
+          }
+        },
+        cutout: '55%'
+      }
+    });
+
+    // Hourly chart
+    new Chart(document.getElementById('hourlyChart'), {
+      type: 'bar',
+      data: {
+        labels: data.hourly.map(h => h.hour + '시'),
+        datasets: [{
+          label: '주문 수',
+          data: data.hourly.map(h => h.count),
+          backgroundColor: data.hourly.map(h => {
+            const v = h.count / Math.max(...data.hourly.map(x => x.count));
+            return `rgba(108,99,255,${0.3 + v * 0.6})`;
+          }),
+          borderColor: '#6c63ff',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 11 } } },
+          y: { grid: { color: '#2e3347' }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+
+    // Weekday chart
+    new Chart(document.getElementById('weekdayChart'), {
+      type: 'bar',
+      data: {
+        labels: data.weekday.map(w => w.day),
+        datasets: [
+          {
+            label: '주문금액',
+            data: data.weekday.map(w => w.amount),
+            backgroundColor: data.weekday.map(w =>
+              ['토','일'].includes(w.day) ? 'rgba(249,115,22,0.5)' : 'rgba(59,130,246,0.4)'
+            ),
+            borderColor: data.weekday.map(w =>
+              ['토','일'].includes(w.day) ? '#f97316' : '#3b82f6'
+            ),
+            borderWidth: 1.5,
+            borderRadius: 5,
+            yAxisID: 'y'
+          },
+          {
+            label: '주문 수',
+            data: data.weekday.map(w => w.orders),
+            type: 'line',
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34,197,94,0.15)',
+            pointBackgroundColor: '#22c55e',
+            pointRadius: 5,
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y2'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index' },
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 12 }, padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ctx.datasetIndex === 0
+                ? ` 주문금액: ${ctx.raw.toLocaleString()}원`
+                : ` 주문 수: ${ctx.raw}건`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            position: 'left',
+            ticks: { callback: v => fmtK(v) },
+            grid: { color: '#2e3347' }
+          },
+          y2: {
+            position: 'right',
+            grid: { display: false },
+            ticks: { callback: v => v + '건' }
+          }
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>
